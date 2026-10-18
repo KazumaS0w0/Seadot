@@ -46,3 +46,7 @@ isi dengan [x] untuk setiap tugas yang sudah selesai dan teruji normal
 - [ ] Implementasi *background script* untuk intersep otomatis URL unduhan (video, audio, arsip).
 - [ ] Mengirim payload (URL, *Headers*, *Cookies*) ke Local API Seadot via HTTP POST.
 - [ ] Desain *popup* UI untuk *toggle auto-capture*.
+
+
+
+selalu ingat apa yg sudah dilakukan sebelumnya termasuk semua fase

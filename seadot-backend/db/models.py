@@ -3,13 +3,20 @@ Seadot Database Models (SQLAlchemy ORM)
 Models untuk Download & History tracking dengan SQLite.
 """
 
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Enum, BigInteger
+from enum import Enum
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, BigInteger, ForeignKey
 from sqlalchemy.dialects.sqlite import REAL as SQLiteReal
+from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
-from .service import DBService
+import uuid
+
+# Base class untuk declarative model registry
+Base = declarative_base()
 
 
 class DownloadStatus(Enum):
+    """Download status enum dengan values"""
+    
     PENDING = "pending"
     DOWNLOADING = "downloading"
     PAUSED = "paused"
@@ -17,36 +24,46 @@ class DownloadStatus(Enum):
     FAILED = "failed"
 
 
-class Download:
+class Download(Base):
     """Active download record dengan real-time progress"""
     
-    # Tables
     __tablename__ = 'downloads'
     
-    # Columns
+    # Primary key - SQLAlchemy will generate Integer automatically
     id = Column(Integer, primary_key=True, autoincrement=True)
-    download_id = Column(String(256), unique=True, nullable=False)  # User-friendly ID (UUID v4)
-    url = Column(String(1024), nullable=False)
+    
+    # User-friendly ID (UUID v4) - unique constraint for identification
+    download_id = Column(String(32), unique=True, nullable=False, index=True)
+    
+    # URL and destination
+    url = Column(String(2048), nullable=False)
     dest_path = Column(Text, nullable=False)
+    
+    # Headers as JSON string
     headers_json = Column(Text)
     
+    # Status tracking
     status = Column(Enum(DownloadStatus), default=DownloadStatus.PENDING)
     
-    # Progress tracking (chunk-based streaming)
-    total_size = Column(BigInteger, default=0)  # Total file size in bytes
-    downloaded_size = Column(BigInteger, default=0)  # Downloaded bytes
+    # Progress tracking (bytes)
+    total_size = Column(BigInteger, default=0)
+    downloaded_size = Column(BigInteger, default=0)
     
-    chunk_size = Column(Integer, default=8*1024*1024)  # 8MB chunks (dynamic)
-    chunk_count_threshold = Column(Integer, default=16)  # Switch to stream mode threshold
+    # Chunk configuration
+    chunk_size = Column(Integer, default=8 * 1024 * 1024)  # 8MB chunks
+    chunk_count_threshold = Column(Integer, default=16)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     paused_at = Column(DateTime, nullable=True)
     
-    # Metadata
+    # Retry logic
     retry_count = Column(Integer, default=0)
+    
+    # Relationships
+    history_records = relationship("DownloadHistory", back_populates="history_records", cascade="all, delete-orphan")
     
     def to_dict(self) -> dict:
         """Convert to dictionary for API response"""
@@ -56,8 +73,8 @@ class Download:
             "url": self.url,
             "dest_path": self.dest_path,
             "headers_json": self.headers_json,
-            "status": self.status.value,
-            "progress": (self.downloaded_size / self.total_size * 100) if self.total_size > 0 else 0,
+            "status": self.status.value if hasattr(self.status, 'value') else str(self.status),
+            "progress": round((self.downloaded_size / self.total_size * 100), 2) if self.total_size > 0 else 0,
             "downloaded_size": self.downloaded_size,
             "total_size": self.total_size,
             "chunk_size": self.chunk_size,
@@ -65,37 +82,47 @@ class Download:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "paused_at": self.paused_at.isoformat() if self.paused_at else None,
             "retry_count": self.retry_count
         }
 
 
-class DownloadHistory:
+class DownloadHistory(Base):
     """Completed download history dengan detailed stats"""
     
-    # Tables
     __tablename__ = 'download_history'
     
-    # Columns
+    # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
-    download_id = Column(String(256), unique=True, nullable=False)  # User-friendly ID (UUID v4)
-    url = Column(String(1024), nullable=False)
+    
+    # Foreign key reference to downloads (unique constraint for joining)
+    download_id = Column(String(32), ForeignKey('downloads.download_id'), unique=True, nullable=False, index=True)
+    
+    # URL and destination (copied from download for redundancy)
+    url = Column(String(2048), nullable=False)
     dest_path = Column(Text, nullable=False)
+    
+    # Headers as JSON string
     headers_json = Column(Text)
     
+    # Status
     status = Column(Enum(DownloadStatus), default=DownloadStatus.COMPLETED)
     
-    # Performance metrics (chunk-based merge stats)
-    total_size = Column(BigInteger, nullable=False)  # Total file size in bytes
+    # Performance metrics (bytes)
+    total_size = Column(BigInteger, nullable=False)
     downloaded_size = Column(BigInteger, nullable=False)
-    chunk_size = Column(Integer, default=8*1024*1024)  # Actual chunk size used
+    chunk_size = Column(Integer, default=8 * 1024 * 1024)
     
-    # Performance metrics
-    duration_seconds = Column(Float, nullable=True)  # Total download time (seconds)
-    avg_speed_mbps = Column(Float, nullable=True)  # Average speed in MB/s
-    peak_speed_mbps = Column(Float, nullable=True)  # Peak speed recorded
+    # Performance metrics (speed)
+    duration_seconds = Column(Float, nullable=True)
+    avg_speed_mbps = Column(Float, nullable=True)
+    peak_speed_mbps = Column(Float, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationship back to download table
+    download = relationship("Download", back_populates="download")
     
     def to_dict(self) -> dict:
         """Convert to dictionary for API response"""
@@ -105,7 +132,7 @@ class DownloadHistory:
             "url": self.url,
             "dest_path": self.dest_path,
             "headers_json": self.headers_json,
-            "status": self.status.value,
+            "status": self.status.value if hasattr(self.status, 'value') else str(self.status),
             "total_size": self.total_size,
             "downloaded_size": self.downloaded_size,
             "chunk_size": self.chunk_size,
@@ -116,122 +143,6 @@ class DownloadHistory:
         }
 
 
-# Helper functions for service layer integration
-
-def save_download_state(db: DBService, download_id: str, url: str, dest_path: str, headers=None):
-    """Save/create download state di database"""
-    session = db.get_session()
-    
-    existing = session.query(Download).filter_by(download_id=download_id).first()
-    
-    if existing:
-        # Update existing
-        existing.url = url
-        existing.dest_path = dest_path
-        if headers:
-            existing.headers_json = headers
-    else:
-        # Create new
-        download = Download(
-            download_id=download_id,
-            url=url,
-            dest_path=dest_path,
-            headers_json=headers,
-            status="downloading"
-        )
-        session.add(download)
-    
-    session.commit()
-    return download
-
-
-def update_download_progress(db: DBService, download_id: str, progress_data: dict):
-    """Update download progress (streaming mode)"""
-    session = db.get_session()
-    download = session.query(Download).filter_by(download_id=download_id).first()
-    
-    if download:
-        download.total_size = progress_data.get("total_size", download.total_size)
-        download.downloaded_size = progress_data.get("downloaded_size", 0)
-        download.status = "downloading"
-        
-        session.commit()
-
-
-def complete_download(db: DBService, download_id: str, final_state: dict):
-    """Mark download as completed & create history record"""
-    session = db.get_session()
-    download = session.query(Download).filter_by(download_id=download_id).first()
-    
-    if download:
-        # Update existing download status
-        download.total_size = final_state.get("total_size", 0)
-        download.downloaded_size = final_state.get("downloaded_size", 0)
-        download.completed_at = datetime.utcnow()
-        download.status = "completed"
-        
-        session.commit()
-        
-        # Create history record (detached from active downloads)
-        history = DownloadHistory(
-            download_id=download.download_id,
-            url=download.url,
-            dest_path=download.dest_path,
-            headers_json=download.headers_json,
-            total_size=download.total_size,
-            downloaded_size=download.downloaded_size,
-            chunk_size=download.chunk_size,
-            status="completed"
-        )
-        
-        session.add(history)
-        session.commit()
-
-
-def cleanup_failed_downloads(db: DBService, age_hours: int = 24):
-    """Cleanup old failed downloads"""
-    session = db.get_session()
-    
-    now = datetime.utcnow()
-    cutoff_time = now.replace(microsecond=0) - __import__('datetime').timedelta(hours=age_hours)
-    
-    # Query for failed downloads older than X hours
-    from sqlalchemy import and_
-    old_downloads = session.query(Download).filter(
-        Download.status == "failed",
-        Download.paused_at < cutoff_time if hasattr(Download, 'paused_at') else True
-    )
-    
-    # Delete old downloads
-    for download in old_downloads:
-        session.delete(download)
-    
-    session.commit()
-    return len(old_downloads)
-
-
-def get_download_by_id(db: DBService, download_id: str):
-    """Get download by user-friendly ID"""
-    return session = db.get_session()
-    return session.query(Download).filter_by(download_id=download_id).first()
-
-
-def get_all_downloads(db: DBService, status_filter=None):
-    """Get all downloads (active + completed)"""
-    session = db.get_session()
-    
-    query = session.query(Download)
-    
-    if status_filter:
-        query = query.filter(Download.status == status_filter)
-    
-    return query.all()
-
-
-def get_download_history(db: DBService, limit: int = 50):
-    """Get recent download history (most recent first)"""
-    session = db.get_session()
-    
-    query = session.query(DownloadHistory).order_by(DownloadHistory.created_at.desc())
-    
-    return query.limit(limit).all()
+# Session factory
+from seadot_backend.db.state import get_db_session
+session = get_db_session()

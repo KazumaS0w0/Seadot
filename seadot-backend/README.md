@@ -1,432 +1,157 @@
 # 🚀 Seadot Backend API
-Modern Download Manager Backend - FastAPI Engine
 
-## 📋 Overview
+Backend lokal Seadot dibangun dengan FastAPI, `aiohttp`, dan SQLite. Backend menyediakan REST API untuk mengelola unduhan, WebSocket untuk pembaruan status, serta extension bridge lokal untuk browser.
 
-Backend core engine built with FastAPI, async I/O, SQLite database, dan WebSocket streaming. Mendukung pause/resume, chunk-based downloads, dan memory-efficient streaming.
+## Fitur
 
----
+- Streaming unduhan dengan penggunaan memori yang terjaga.
+- HTTP Range dan unduhan multi-bagian bila server sumber mendukungnya, dengan fallback ke streaming biasa.
+- Pause, resume, status progres, riwayat, dan statistik unduhan.
+- Pengelompokan file ke folder kategori di Downloads Windows.
+- Extension bridge localhost untuk Chrome, Edge, Opera, dan Firefox.
+- Pengaturan bandwidth, jumlah bagian, dan aksi opsional setelah antrean selesai.
 
-## ✅ Features Implemented
+## Menjalankan di Windows
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Core Downloader | ✅ Complete | Async HTTP downloader dengan dynamic chunking |
-| Database Layer | ✅ Complete | SQLAlchemy models + repository pattern |
-| WebSocket Streaming | ✅ Complete | Real-time progress updates via WS |
-| Pause/Resume | ✅ Complete | State persistence via `.state.json` |
-| History API | ✅ Complete | Full download history tracking |
-| Health Check | ✅ Complete | `/health` endpoint untuk monitoring |
-| Lifecycle Mgmt | ✅ Complete | Start/Pause/Resume/Stop endpoints |
-
----
-
-## 🏗️ Architecture
-
-```
-seadot-backend/
-├── api/
-│   └── app.py              # FastAPI application
-├── core/
-│   └── downloader.py       # Core download engine
-├── db/
-│   ├── models.py           # SQLAlchemy models
-│   └── service.py          # Repository layer
-├── run_dev.py              # Server runner script
-└── requirements.txt        # Python dependencies
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
-```bash
-pip install -r seadot-backend/requirements.txt
-```
-
-**Dependencies:**
-- `fastapi` - Web framework
-- `uvicorn` - ASGI server
-- `aiohttp` - Async HTTP client
-- `sqlalchemy` - Database ORM
-- `websockets` - WebSocket support
-- `pydantic` - Data validation (v2)
-
-### 2. Run Server
-```bash
-cd seadot-backend
-python run_dev.py
-```
-
-**Expected Output:**
-```
-🚀 Starting server at http://127.0.0.1:8000
-   📂 Backend folder: C:\Seadot\seadot-backend
-   🐍 Python version: 3.x.x
-============================================================
-
-📡 Listening on http://127.0.0.1:8000
-Press Ctrl+C to stop
-```
-
-### 3. Auto-docs & CORS
-Akses `http://127.0.0.1:8000/docs` untuk Swagger UI API documentation.
-
----
-
-## QA Agent Scripts (Windows)
-
-Skrip QA menguji backend pada `http://localhost:8000`. Jalankan server dan agen dari dua terminal PowerShell terpisah.
-
-Terminal pertama:
+Buka PowerShell dari root repository:
 
 ```powershell
-Set-Location F:\Seadot\seadot-backend
-python run_dev.py
-```
-
-Terminal kedua, pasang dependensi jika belum ada lalu jalankan tes beban:
-
-```powershell
-Set-Location F:\Seadot\seadot-backend
+Set-Location .\seadot-backend
 python -m pip install -r requirements.txt
+python run_dev.py
+```
+
+Server API secara default berjalan di `http://127.0.0.1:8000`. Dokumentasi interaktif tersedia di:
+
+- Swagger UI: <http://127.0.0.1:8000/docs>
+- OpenAPI JSON: <http://127.0.0.1:8000/openapi.json>
+- Health check: <http://127.0.0.1:8000/api/health>
+
+Konfigurasi opsional melalui environment variable: `HOST` (default `127.0.0.1`), `PORT` (default `8000`), `RELOAD` (default `false`), dan `WORKERS` (default `1`).
+
+## API utama
+
+Semua endpoint di bawah menggunakan base URL `http://127.0.0.1:8000`.
+
+| Method | Endpoint | Keterangan |
+| --- | --- | --- |
+| `GET` | `/api/health` | Status backend |
+| `POST` | `/api/downloads/create` | Buat dan langsung mulai unduhan |
+| `GET` | `/api/downloads` | Daftar unduhan; filter opsional `status_filter` |
+| `GET` | `/api/downloads/{download_id}` | Status/progres unduhan |
+| `PUT` | `/api/downloads/{download_id}/options` | Atur opsi unduhan |
+| `POST` | `/api/downloads/start?download_id=...` | Mulai record yang sudah ada |
+| `POST` | `/api/downloads/pause?download_id=...` | Jeda unduhan aktif |
+| `POST` | `/api/downloads/resume?download_id=...` | Lanjutkan unduhan |
+| `DELETE` | `/api/downloads/{download_id}?delete_file=false` | Hapus record; file tidak dihapus secara default |
+| `GET` | `/api/downloads/history` | Riwayat unduhan |
+| `GET` | `/api/stats` | Statistik unduhan |
+| `GET` | `/api/downloads/categories` | Daftar folder kategori |
+| `GET` | `/api/system/settings` | Baca pengaturan sistem |
+| `PUT` | `/api/system/settings` | Simpan pengaturan sistem |
+| `GET` | `/api/system/action` | Status aksi daya tertunda |
+| `POST` | `/api/system/action/cancel` | Batalkan aksi daya |
+| `WS` | `/ws/{download_id}` | Pembaruan unduhan real-time |
+
+### Membuat unduhan
+
+`POST /api/downloads/create` membuat record sekaligus menjadwalkan transfer. `filename`, `category`, dan `destination_folder` dapat dihilangkan; backend menentukan nama/kategori/folder dari URL dan pengaturan folder.
+
+```powershell
+$body = @{
+    url = "https://example.com/archive.zip"
+    filename = "archive.zip"
+    split_count = 4
+    conflict_policy = "number"
+} | ConvertTo-Json
+
+$download = Invoke-RestMethod `
+    -Uri "http://127.0.0.1:8000/api/downloads/create" `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $body
+
+$download
+```
+
+`split_count` menerima nilai 1–16 (UI menyediakan 1, 2, 4, 8, atau 16). `conflict_policy` dapat berupa `number` atau `overwrite`; tanpa kebijakan tersebut, nama file yang sudah ada menghasilkan HTTP 409. URL harus menggunakan HTTP atau HTTPS.
+
+### Membuat record lalu mengendalikan lifecycle
+
+Untuk memanggil `start`, `pause`, atau `resume` secara terpisah, buat record pending melalui endpoint kompatibilitas:
+
+```powershell
+$id = "qa-demo-01"
+$record = @{
+    download_id = $id
+    url = "https://example.com/archive.zip"
+    dest_path = "$HOME\Downloads\archive.zip"
+    status = "pending"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/download/create" `
+    -Method Post -ContentType "application/json" -Body $record
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/downloads/start?download_id=$id" -Method Post
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/downloads/pause?download_id=$id" -Method Post
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/downloads/resume?download_id=$id" -Method Post
+```
+
+### Opsi unduhan
+
+`PUT /api/downloads/{download_id}/options` menerima objek JSON berikut:
+
+```json
+{
+  "speed_limit_bps": 0,
+  "split_count": 4,
+  "completion_action": "none",
+  "countdown_minutes": 2
+}
+```
+
+`speed_limit_bps: 0` berarti tanpa batas. Nilai aksi: `none`, `shutdown`, `sleep`, `hibernate`, atau `restart`. Aksi daya dan pendaftaran startup didukung pada Windows; aksi setelah unduhan memerlukan konfirmasi di UI.
+
+## Extension bridge
+
+Aplikasi desktop menjalankan bridge lokal pada port default `47831`. Endpoint `GET /ping` dan `GET /status` memeriksa bridge; `POST /capture` menerima link dari ekstensi browser. Pengaturan bridge dan cara memasang ekstensi dijelaskan di [README ekstensi](../seadot-extension/README.md).
+
+Jangan mengekspos port API atau bridge ke jaringan publik tanpa menambahkan autentikasi dan pembatasan akses yang sesuai. API lokal tidak menyediakan autentikasi secara default.
+
+## Pengujian
+
+Dari root repository:
+
+```powershell
+python -m pytest .\seadot-backend\tests -q
+python -m pytest .\seadot-backend\desktop\test_phase6.py -q
+```
+
+Skrip QA berjalan saat backend aktif, dari terminal PowerShell terpisah:
+
+```powershell
+Set-Location .\seadot-backend
+python agent_resume_test.py
 python agent_stress_test.py
 ```
 
-`agent_stress_test.py` membuat 10 record, mengirim 10 request start bersamaan, lalu menampilkan RSS proses backend selama 30 detik. PID proses listener dideteksi otomatis. Jika Windows menolak pemeriksaan PID, tentukan secara manual:
+`agent_stress_test.py` mengirim 10 start request bersamaan dan memantau RSS backend selama 30 detik. Kedua skrip memakai fixture file 1 GB yang dialirkan lewat loopback lokal, bukan dari server pihak ketiga, dan mencoba menghentikan transfer uji setelah selesai. Lihat output agen untuk status hasil serta peringatan cleanup.
+
+## Aplikasi desktop
+
+Untuk menjalankan shell desktop Windows beserta API dan extension bridge:
 
 ```powershell
-python agent_stress_test.py --pid 12345
+Set-Location .\seadot-backend
+python run_desktop.py
 ```
 
-Tes lifecycle:
+Mode headless (server lokal tanpa jendela native):
 
 ```powershell
-python agent_resume_test.py
-```
-
-Backend menggunakan endpoint `/api/v1/download/create` untuk menyiapkan record dan `/api/downloads/start`, `/api/downloads/pause`, serta `/api/downloads/resume` untuk lifecycle. Karena endpoint start benar-benar memulai transfer, kedua agen menyediakan fixture HTTP lokal di loopback yang mengalirkan file uji berukuran nominal 1 GB secara perlahan. Data tidak diunduh dari internet; transfer dihentikan oleh agen setelah tes, sementara record uji ditandai gagal oleh endpoint remove.
-
----
-
-## System Automation (Windows Desktop)
-
-Panel **Settings → Otomatisasi sistem** menyediakan opsi berikut:
-
-- **Jalankan saat login Windows**: aktif secara default pada instalasi baru; Seadot didaftarkan pada startup pengguna Windows. Preferensi instalasi yang sudah tersimpan tidak ditimpa.
-- **Aksi setelah unduhan selesai**: nonaktif secara default; pilih shutdown, sleep, atau restart jika diperlukan. Aksi dijalankan hanya saat semua record unduhan terminal dan setidaknya satu unduhan berhasil.
-- **Hitung mundur**: default 2 menit, dapat diatur antara 1–120 menit. Hitung mundur yang tertunda dapat dibatalkan dari panel Settings.
-
-Mengaktifkan aksi daya memerlukan konfirmasi di UI. Pengaturan disimpan di `%LOCALAPPDATA%\Seadot\settings.json`. Aksi daya dan registrasi startup hanya didukung pada Windows.
-
-## Download Categories and Destinations
-
-Pada peluncuran desktop pertama, Seadot membuat folder kategori berikut langsung di folder `Downloads` pengguna (folder yang sudah ada tidak dihapus atau dikosongkan):
-
-- `Applications`
-- `Videos`
-- `Music`
-- `Documents`
-- `Archives`
-- `Images`
-- `Other`
-
-Folder dasar dapat diubah dengan environment variable `SEADOT_DOWNLOAD_ROOT`. Seadot mengelompokkan file berdasarkan ekstensi, menampilkan download dalam rak kategori di **All Downloads**, dan meminta konfirmasi folder tujuan sebelum mulai mengunduh. Pengguna dapat mengganti kategori maupun path tujuan pada konfirmasi tersebut.
-
-Endpoint kategori adalah `GET /api/downloads/categories`; endpoint konfirmasi dan mulai unduhan adalah `POST /api/downloads/create`.
-
----
-
-## 📡 API Endpoints
-
-### Health Check
-```bash
-curl http://localhost:8000/health
-# Response: {"status": "healthy"}
-```
-
-### Start Download
-```bash
-curl -X POST "http://localhost:8000/start" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com/file.zip",
-    "filename": "file.zip",
-    "chunk_size_mb": 8,
-    "threshold_chunks": 16,
-    "on_progress": {"enabled": true},
-    "on_complete": {"enabled": true},
-    "on_error": {"enabled": true}
-  }'
-```
-
-### WebSocket Streaming
-```bash
-# Connect to real-time progress updates
-wscat -c "ws://localhost:8000/ws/{download_id}"
-# Or use browser extension / third-party WS client
-```
-
-### Pause Download
-```bash
-curl -X POST "http://localhost:8000/pause" \
-  -H "Content-Type: application/json" \
-  -d '{"download_id": "uuid-here"}'
-```
-
-### Resume Download
-```bash
-curl -X POST "http://localhost:8000/resume" \
-  -H "Content-Type: application/json" \
-  -d '{"download_id": "uuid-here"}'
-```
-
-### Stop Download
-```bash
-curl -X POST "http://localhost:8000/stop" \
-  -H "Content-Type: application/json" \
-  -d '{"download_id": "uuid-here"}'
-```
-
-### Get History List
-```bash
-curl http://localhost:8000/history
-# Returns array of recent downloads
-```
-
-### Get Single Download Info
-```bash
-curl http://localhost:8000/history/{download_id}
-# Returns detailed download info with progress/stats
+python run_desktop.py --headless
 ```
 
 ---
 
-## 🔧 Configuration
-
-Environment variables (optional):
-- `HOST` - Server host (default: 127.0.0.1)
-- `PORT` - Server port (default: 8000)
-- `RELOAD` - Auto-reload on dev (default: false)
-- `WORKERS` - Uvicorn workers (default: 1)
-
-Example:
-```bash
-set HOST=127.0.0.1
-set PORT=8000
-set RELOAD=true
-python run_dev.py
-```
-
----
-
-## 🧪 Testing Endpoints Manually
-
-### Using PowerShell:
-```powershell
-# Health check
-curl http://localhost:8000/health
-
-# Start download
-$resp = Invoke-WebRequest -Uri "http://localhost:8000/start" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{
-    "url": "https://example.com/file.zip",
-    "filename": "test.zip",
-    "chunk_size_mb": 8,
-    "threshold_chunks": 16
-  }'
-
-# Get download ID from response
-$downloadId = $resp.Content | ConvertFrom-Json | Select-Object -ExpandProperty download_id
-
-# Check status after a moment
-curl "http://localhost:8000/history/$downloadId"
-```
-
-### Using cURL:
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Start download
-curl -X POST http://localhost:8000/start `
-  -H "Content-Type: application/json" `
-  -d '{"url":"https://example.com/file.zip","filename":"test.zip"}'
-
-# Get history
-curl http://localhost:8000/history
-```
-
----
-
-## 📊 Download Engine Architecture
-
-### Dual-Mode Strategy (Memory-Efficient):
-1. **Simple Mode**: Direct download for small files (< 16 chunks)
-2. **Streaming Mode**: Block-based merge for large files (> 16 chunks)
-
-**Parameters:**
-- `chunk_size_mb=8` → 8MB per chunk
-- `threshold_chunks=16` → Switch to stream mode when exceeded
-
-**Benefits:**
-- ✅ No memory leak (anti spike)
-- ✅ Efficient file I/O
-- ✅ Safe merge via streaming
-- ✅ Pause/resume supported
-
-### State Persistence:
-1. SQLite database (transactional history)
-2. `.state.json` files (pause/resume state)
-3. Automatic sync between both
-
----
-
-## 🛠️ Core Components
-
-### 1. Downloader (`core/downloader.py`)
-- Async HTTP client using `aiohttp`
-- Dynamic chunk sizing
-- Progress tracking with callbacks
-- Error handling & retry logic
-
-**Key Methods:**
-- `async def download()` - Main download loop
-- `async def get_file_size()` - Get remote file size
-- `async def stream_merge()` - Merge blocks efficiently
-- `async def save_state()` / `restore_state()` - Pause/Resume
-
-### 2. Models (`db/models.py`)
-SQLAlchemy models untuk:
-- `DownloadModel` - Active download tracking
-- `HistoryModel` - Completed downloads log
-
-### 3. Service (`db/service.py`)
-Repository pattern dengan methods:
-- `save_download()`, `update_status()`
-- `save_history()`, `get_history()`
-- Transaction support untuk atomic ops
-
-### 4. FastAPI App (`api/app.py`)
-REST API endpoints:
-- `/health` - Health check
-- `POST /start` - Initiate download
-- `GET /history` - List all downloads
-- `GET /history/{id}` - Single download info
-- `POST /pause` - Pause download
-- `POST /resume` - Resume download
-- `POST /stop` - Stop download
-- `GET /ws/{download_id}` - WebSocket stream
-
----
-
-## 📝 Error Handling
-
-**Common Errors & Solutions:**
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `503 Service Unavailable` | SQLite locked | Close other connections or restart server |
-| `400 Bad Request` | Invalid JSON | Check request body format |
-| `422 Validation Error` | Missing fields | Include all required fields in payload |
-| `Download failed` | Network error | Retry with exponential backoff (built-in) |
-
----
-
-## 🔐 Security Notes
-
-- CORS enabled untuk cross-origin requests
-- No authentication by default (can be added later)
-- Input validation via Pydantic models
-- File path sanitization to prevent injection
-
----
-
-## 🧪 Integration Test Checklist
-
-Test these scenarios:
-
-### ✅ Basic Downloads
-- [ ] Start small file download (< 10MB)
-- [ ] Verify progress updates via WebSocket
-- [ ] Check completion callback triggers
-- [ ] History endpoint returns correct data
-
-### ✅ Large File Downloads
-- [ ] Start large file (> 128MB = 16 chunks)
-- [ ] Verify streaming mode activation
-- [ ] Check memory usage stays stable
-- [ ] Complete successfully without memory spike
-
-### ✅ Pause/Resume
-- [ ] Start download until ~50% progress
-- [ ] Call `/pause` endpoint
-- [ ] Verify `.state.json` created
-- [ ] Call `/resume` from paused state
-- [ ] Download continues from correct position
-
-### ✅ Stop & Recovery
-- [ ] Start download
-- [ ] Call `/stop` to abort
-- [ ] Check cleanup happens
-- [ ] File should be partial/removed based on state
-
----
-
-## 📈 Performance Benchmarks
-
-| Operation | Time (MB) | Memory Peak | Notes |
-|-----------|-----------|-------------|-------|
-| 10MB download | ~2s | Stable | Simple mode |
-| 100MB download | ~15s | ~60MB | Streaming mode kicks in |
-| 1GB download | ~120s | ~70MB | Anti leak verified |
-
----
-
-## 🚨 Troubleshooting
-
-### Server Won't Start
-```bash
-# Check Python version
-python --version  # Should be 3.9+
-
-# Install dependencies
-pip install -r seadot-backend/requirements.txt
-
-# Verify packages
-pip show aiohttp fastapi sqlalchemy websockets
-```
-
-### Import Errors
-- Ensure `__init__.py` files exist in all package folders
-- Use absolute imports (already fixed in code)
-- Run from `seadot-backend` directory or adjust path
-
-### Database Lock Issues
-```bash
-# Find locked database files
-tasklist | findstr python
-
-# Kill stuck processes if needed
-taskkill /F /IM python.exe
-```
-
----
-
-## 🔄 Next Steps (Phase 2)
-
-After backend is verified working:
-
-1. ✅ Create Frontend React UI
-2. ✅ Build Browser Extension
-3. ✅ Add Cross-Device Sync
-4. ✅ Implement Authentication
-5. ✅ Deploy to production server
-
----
-
-**Last Updated:** 2026-10-17  
-**Version:** 1.0.0 (Phase 1 Complete)
+Dibuat sebagai bagian dari [Seadot](../README.md) oleh [@KazumaS0w0](https://github.com/KazumaS0w0).

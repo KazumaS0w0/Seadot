@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Seadot Download Capture",
+  "version": "0.1.0",
+  "description": "Send browser download URLs to the local Seadot bridge.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "seadot-download-capture@seadot.local"
+    }
+  },
+  "permissions": [
+    "downloads",
+    "storage",
+    "activeTab"
+  ],
+  "optional_permissions": [
+    "cookies"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "scripts": [
+      "service-worker.js"
+    ]
+  },
+  "action": {
+    "default_title": "Seadot Download Capture",
+    "default_popup": "popup.html"
+  }
+}

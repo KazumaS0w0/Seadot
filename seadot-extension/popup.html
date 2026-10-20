@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seadot</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="heading">
+        <div class="brand-mark" aria-hidden="true">S</div>
+        <div>
+          <h1>Seadot</h1>
+          <p>Download Capture</p>
+        </div>
+      </header>
+
+      <section class="connection" aria-live="polite">
+        <span class="status-dot" id="connection-dot"></span>
+        <span id="connection-status">Memeriksa koneksi...</span>
+      </section>
+
+      <label class="toggle-row" for="auto-capture">
+        <span>
+          <strong>Auto-capture</strong>
+          <small>Alihkan unduhan ke engine Seadot</small>
+        </span>
+        <input id="auto-capture" type="checkbox" />
+      </label>
+
+      <label class="toggle-row" for="include-cookies">
+        <span>
+          <strong>Sertakan cookies & referrer</strong>
+          <small>Opsional; hanya untuk situs yang diizinkan</small>
+        </span>
+        <input id="include-cookies" type="checkbox" />
+      </label>
+      <button id="grant-site-access" class="permission-button" type="button">
+        Izinkan cookies untuk situs ini
+      </button>
+      <p class="permission-status" id="permission-status" aria-live="polite"></p>
+
+      <label class="field-label" for="bridge-url">Alamat Seadot lokal</label>
+      <input id="bridge-url" class="text-input" type="url" spellcheck="false" />
+
+      <p class="privacy-note">
+        Cookies tidak dibaca kecuali opsi aktif dan izin situs diberikan. Izin berlaku per situs; kredensial hanya dipakai untuk permintaan awal dan tidak disimpan di riwayat.
+      </p>
+      <p class="last-capture" id="last-capture" aria-live="polite"></p>
+
+      <script src="popup.js"></script>
+    </main>
+  </body>
+</html>

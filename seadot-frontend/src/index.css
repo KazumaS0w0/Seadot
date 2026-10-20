@@ -1,5 +1,259 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Seadot Download Manager - Dark Theme Foundation */
 
+/* Tailwind CSS v4 setup */
+@import "tailwindcss";
+
+/* Base dark theme colors */
 :root {
+  --bg-primary: #0B0F19;
+  --bg-secondary: #0D1221;
+  --bg-tertiary: #0A0E17;
+  --bg-card: #1e293b;
+  --border-color: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-primary: #3b82f6;
+  --accent-secondary: #0ea5e9;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-error: #ef4444;
+}
+
+html {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+html.light {
+  --bg-primary: #f4f6fb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8edf7;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+}
+
+html.light body {
+  background: #f4f6fb;
+  color: #0f172a;
+}
+
+/* Use a coordinated set of light surfaces rather than inverting dark utility colors. */
+html.light body {
+  background: #edf1f7;
+}
+
+html.light .app-shell {
+  background-color: #edf1f7 !important;
+  color: #172033;
+}
+
+html.light .sidebar-shell,
+html.light .options-panel {
+  background-color: #f7f9fc !important;
+  border-color: #dce3ed;
+}
+
+html.light .sidebar-setting-card,
+html.light .sidebar-utility {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+}
+
+html.light .theme-picker {
+  background-color: #e9eef5 !important;
+  border-color: #dce3ed;
+}
+
+html.light .action-bar {
+  background-color: rgba(247, 249, 252, 0.94) !important;
+  border-color: #dce3ed;
+}
+
+html.light .download-table-shell {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+  box-shadow: 0 18px 45px rgba(31, 45, 70, 0.08);
+}
+
+html.light .table-header {
+  background-color: rgba(247, 249, 252, 0.97) !important;
+  color: #64748b;
+}
+
+html.light .search-control {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+}
+
+html.light .status-bar {
+  background-color: rgba(247, 249, 252, 0.96) !important;
+  border-color: #dce3ed;
+}
+
+html.light .settings-rack {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+  box-shadow: 0 8px 22px rgba(31, 45, 70, 0.05);
+}
+
+html.light .download-rack {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  border-color: #dce3ed;
+}
+
+html.light .add-link-modal {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+}
+
+html.light .download-details-modal {
+  background-color: #ffffff !important;
+  border-color: #dce3ed;
+}
+
+html.light .download-details-modal [class~="border-white/10"] {
+  border-color: #dce3ed !important;
+}
+
+html.light .file-extension-label {
+  background-color: #ffffff !important;
+  color: #475569;
+}
+
+html.light .status-filter,
+html.light .status-filter option {
+  color: #243247;
+  color-scheme: light;
+}
+
+html:not(.light) .status-filter,
+html:not(.light) .status-filter option {
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
+html.light .status-filter option {
+  background-color: #ffffff;
+}
+
+html:not(.light) .status-filter option {
+  background-color: #0b0f19;
+}
+
+html.light [class~="text-slate-50"],
+html.light [class~="text-slate-100"] {
+  color: #0f172a !important;
+}
+
+html.light [class~="text-slate-200"],
+html.light [class~="text-slate-300"] {
+  color: #334155 !important;
+}
+
+html.light [class~="text-slate-400"] {
+  color: #475569 !important;
+}
+
+html.light [class~="text-slate-500"] {
+  color: #64748b !important;
+}
+
+html.light [class~="text-violet-200"] {
+  color: #6d28d9 !important;
+}
+
+html.light aside h1,
+html.light aside h2,
+html.light form h2 {
+  color: #0f172a;
+}
+
+html.light [class~="hover:bg-white/5"]:hover {
+  background-color: rgba(15, 23, 42, 0.07) !important;
+}
+
+html.light [class~="hover:text-white"]:hover {
+  color: #0f172a !important;
+}
+
+html.light .column-resizer-line {
+  background-color: #cbd5e1;
+}
+
+html.light .column-resizer:hover .column-resizer-line,
+html.light .column-resizer:focus-visible .column-resizer-line {
+  background-color: #8b5cf6;
+}
+
+html:not(.light) .column-resizer-line {
+  background-color: #475569;
+}
+
+html:not(.light) .column-resizer:hover .column-resizer-line,
+html:not(.light) .column-resizer:focus-visible .column-resizer-line {
+  background-color: #a78bfa;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+html:not(.light) {
+  color-scheme: dark;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0F19;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #e8edf7;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.column-resizer-line {
+  position: absolute;
+  inset-block: 10px;
+  right: 5px;
+  width: 1px;
+  border-radius: 999px;
+  transition: background-color 120ms ease, width 120ms ease;
+}
+
+.column-resizer:hover .column-resizer-line,
+.column-resizer:focus-visible .column-resizer-line {
+  right: 4px;
+  width: 3px;
+}

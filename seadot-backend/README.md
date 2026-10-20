@@ -75,6 +75,69 @@ Akses `http://127.0.0.1:8000/docs` untuk Swagger UI API documentation.
 
 ---
 
+## QA Agent Scripts (Windows)
+
+Skrip QA menguji backend pada `http://localhost:8000`. Jalankan server dan agen dari dua terminal PowerShell terpisah.
+
+Terminal pertama:
+
+```powershell
+Set-Location F:\Seadot\seadot-backend
+python run_dev.py
+```
+
+Terminal kedua, pasang dependensi jika belum ada lalu jalankan tes beban:
+
+```powershell
+Set-Location F:\Seadot\seadot-backend
+python -m pip install -r requirements.txt
+python agent_stress_test.py
+```
+
+`agent_stress_test.py` membuat 10 record, mengirim 10 request start bersamaan, lalu menampilkan RSS proses backend selama 30 detik. PID proses listener dideteksi otomatis. Jika Windows menolak pemeriksaan PID, tentukan secara manual:
+
+```powershell
+python agent_stress_test.py --pid 12345
+```
+
+Tes lifecycle:
+
+```powershell
+python agent_resume_test.py
+```
+
+Backend menggunakan endpoint `/api/v1/download/create` untuk menyiapkan record dan `/api/downloads/start`, `/api/downloads/pause`, serta `/api/downloads/resume` untuk lifecycle. Karena endpoint start benar-benar memulai transfer, kedua agen menyediakan fixture HTTP lokal di loopback yang mengalirkan file uji berukuran nominal 1 GB secara perlahan. Data tidak diunduh dari internet; transfer dihentikan oleh agen setelah tes, sementara record uji ditandai gagal oleh endpoint remove.
+
+---
+
+## System Automation (Windows Desktop)
+
+Panel **Settings → Otomatisasi sistem** menyediakan opsi berikut:
+
+- **Jalankan saat login Windows**: aktif secara default pada instalasi baru; Seadot didaftarkan pada startup pengguna Windows. Preferensi instalasi yang sudah tersimpan tidak ditimpa.
+- **Aksi setelah unduhan selesai**: nonaktif secara default; pilih shutdown, sleep, atau restart jika diperlukan. Aksi dijalankan hanya saat semua record unduhan terminal dan setidaknya satu unduhan berhasil.
+- **Hitung mundur**: default 2 menit, dapat diatur antara 1–120 menit. Hitung mundur yang tertunda dapat dibatalkan dari panel Settings.
+
+Mengaktifkan aksi daya memerlukan konfirmasi di UI. Pengaturan disimpan di `%LOCALAPPDATA%\Seadot\settings.json`. Aksi daya dan registrasi startup hanya didukung pada Windows.
+
+## Download Categories and Destinations
+
+Pada peluncuran desktop pertama, Seadot membuat folder kategori berikut langsung di folder `Downloads` pengguna (folder yang sudah ada tidak dihapus atau dikosongkan):
+
+- `Applications`
+- `Videos`
+- `Music`
+- `Documents`
+- `Archives`
+- `Images`
+- `Other`
+
+Folder dasar dapat diubah dengan environment variable `SEADOT_DOWNLOAD_ROOT`. Seadot mengelompokkan file berdasarkan ekstensi, menampilkan download dalam rak kategori di **All Downloads**, dan meminta konfirmasi folder tujuan sebelum mulai mengunduh. Pengguna dapat mengganti kategori maupun path tujuan pada konfirmasi tersebut.
+
+Endpoint kategori adalah `GET /api/downloads/categories`; endpoint konfirmasi dan mulai unduhan adalah `POST /api/downloads/create`.
+
+---
+
 ## 📡 API Endpoints
 
 ### Health Check

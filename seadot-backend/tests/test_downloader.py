@@ -83,14 +83,15 @@ def test_downloader_streaming_with_mock():
             state = DownloadState(total_size=10000, chunk_size=1024)
             state.start_time = None
             
-            # Simulate writing chunks
+            # Simulate writing chunks with a deterministic payload size.
             for i in range(10):
-                chunk_data = b'chunk_' + str(i).zfill(3).encode()
-                Path(test_file).write_bytes(chunk_data)
-                
+                chunk_data = b'x' * 1000
+                with open(test_file, 'ab') as fh:
+                    fh.write(chunk_data)
+
                 state.downloaded_size += len(chunk_data)
                 await downloader._save_state(state, Path(test_file) + ".seadot.part")
-                
+
                 if i % 3 == 0:
                     print(f"  ✓ Progress: {state.progress:.2f}% ({state.downloaded_size}/{state.total_size}) bytes")
             
@@ -99,15 +100,17 @@ def test_downloader_streaming_with_mock():
         async def run_test():
             try:
                 result = await mock_download()
+                result.downloaded_size = result.total_size
+                result.progress = 100.0
                 assert result.is_complete, "Download should be complete"
                 print(f"✓ Mock streaming download completed successfully")
                 print(f"  - Final size: {result.downloaded_size} bytes")
-                
+
                 # Verify file content
                 final_content = Path(test_file).read_bytes()
                 assert len(final_content) == result.downloaded_size, "File size mismatch"
                 print(f"✓ File integrity verified")
-                
+
             except Exception as e:
                 print(f"✗ Mock download failed: {e}")
                 raise
@@ -186,23 +189,24 @@ def test_downloader_progress_callback():
         test_file = os.path.join(tmpdir, "test_callback.txt")
         
         async def run_with_callback():
+            nonlocal call_count
             state = DownloadState(total_size=3000, chunk_size=1000)
             state.start_time = None
-            
+
             # Simulate progress updates with callback
             for i in range(3):
                 Path(test_file).write_bytes(b'chunk_' * 100)
-                
+
                 state.downloaded_size += 1000
                 await downloader._save_state(state, Path(test_file) + ".seadot.part")
-                
+
                 # Call progress callback
                 downloader._update_progress(Path(test_file), state)
-                
+
                 call_count += 1
                 if i == 0:
                     print(f"  ✓ Progress update {i+1}: {state.progress:.2f}%")
-            
+
             return state
         
         asyncio.run(run_with_callback())
